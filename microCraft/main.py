@@ -69,3 +69,24 @@ class MainFactory(ServerFactory):
     def send_chat(self, message):
         for player in self.players:
             player.send_packet("chat_message", player.buff_type.pack_chat(message) + player.buff_type.pack('B', 0))
+
+
+def main(argv):
+    # Parse options
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-a", "--host", default="", help="address to listen on")
+    parser.add_argument("-p", "--port", default=25565, type=int, help="port to listen on")
+    args = parser.parse_args(argv)
+
+    # Create factory
+    factory = MainFactory()
+
+    # Listen
+    factory.listen(args.host, args.port)
+    reactor.run()
+
+
+if __name__ == "__main__":
+    import sys
+    main(sys.argv[1:])
