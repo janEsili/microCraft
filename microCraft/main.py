@@ -17,14 +17,14 @@ class MainProtocol(ServerProtocol):
 
         # Send "Join Game" packet
         self.send_packet("join_game",
-                         self.buff_type.pack("iBilB",
+                         self.buff_type.pack("iBqiB",
                                              0,  # entity id
                                              3,  # game mode
                                              0,  # dimension
                                              0,  # hashed seed
                                              0),  # max players
                          self.buff_type.pack_string("flat"),  # level type
-                         self.buff_type.pack_varint(1),  # view distance
+                         self.buff_type.pack_varint(32),  # view distance
                          self.buff_type.pack("??",
                                              False,  # reduced debug info
                                              False))  # show respawn screen
@@ -41,7 +41,7 @@ class MainProtocol(ServerProtocol):
                          self.buff_type.pack_varint(0))  # teleport id
 
         # Start sending "Keep Alive" packets
-        self.ticker.add_loop(20, self.send_packet("keep_alive", self.keep_alive))
+        self.ticker.add_loop(20, self.keep_alive())
 
         # Announce player joined
         self.factory.send_chat(u"\u00a7e%s has joined." % self.display_name)
@@ -54,12 +54,14 @@ class MainProtocol(ServerProtocol):
 
     def keep_alive(self):
         self.alive_key = random.getrandbits(32)
-        self.buff_type.pack("l", self.alive_key)
+        self.send_packet("keep_alive", self.buff_type.pack("l", self.alive_key))
 
     def packet_unhandled(self, buff, name):
         if name == "keep_alive":
             if buff != self.alive_key:
                 ServerProtocol.close(self, "Invalid keep-alive packet.")
+        else:
+            buff.discard()
 
 
 class MainFactory(ServerFactory):
@@ -69,6 +71,16 @@ class MainFactory(ServerFactory):
     def send_chat(self, message):
         for player in self.players:
             player.send_packet("chat_message", player.buff_type.pack_chat(message) + player.buff_type.pack('B', 0))
+
+    def bees(self):
+        for player in self.players:
+            player.send_packet("spawn_living_entity",
+                               player.buff_type.pack_varint(),     # Entity ID
+                               player.buff_type.pack_uuid(),       # Entity UUID
+                               player.buff_type.pack_varint(36),   # Entity type
+                               player.buff_type.pack_position(0, 5, 0), # Entity XYZ
+                               player.buff_type.pack_rotation(0, 0, 0), # TODO
+                               )
 
 
 def main(argv):
@@ -84,6 +96,7 @@ def main(argv):
 
     # Listen
     factory.listen(args.host, args.port)
+
     reactor.run()
 
 
